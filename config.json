@@ -3,7 +3,7 @@
     "api_key": "",
     "base_url": "https://api.deepseek.com/v1",
     "models": ["deepseek-reasoner", "deepseek-chat", "qwen-plus"],
-    "default_model": "deepseek-reasoner"
+    "default_model": "deepseek-chat"
   },
   "prompts": {
     "system_prompt": "你是一名软件测试人员，请根据以下需求生成测试用例，返回JSON格式：\n- 每个测试用例包含：directory(模块),title(标题), steps(步骤列表), expected_result(预期结果)\n- 要求覆盖正常情况和异常情况\n- 测试用例应该详细且具体\n- 确保测试步骤清晰可执行\n- 模块作为分类作用，方便阅读；\n- 测试用例不少于50条\n\n只需返回JSON数组，不要额外解释。示例格式：\n                                [{{\n                                    \"directory\": \"模块\",\n                                    \"title\": \"测试用例1\",\n                                    \"steps\": [\"步骤1\", \"步骤2\"],\n                                    \"expected_result\": \"预期结果\"\n                                }}],",
