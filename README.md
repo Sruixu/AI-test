@@ -52,6 +52,7 @@
 ### 第一步：API设置
 在 “config.json”文件配置API_key
    ```bash
+   {
      "api": {
     "api_key": "",   在""里输入你的API_key 
     "base_url": "https://api.deepseek.com/v1",
