@@ -183,7 +183,7 @@ class TestGeneratorGUI(QMainWindow):
                     "include_precondition": True
                 },
                 "ui": {
-                    "window_title": "Deepseek/MiMo 测试用例生成工具",
+                    "window_title": "大模型AI测试用例生成工具",
                     "window_width": 900,
                     "window_height": 700
                 }
