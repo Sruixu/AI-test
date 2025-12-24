@@ -50,7 +50,7 @@ class WorkerThread(QThread):
                     {"role": "user", "content": formatted_prompt}
                 ],
                 temperature=0.7,
-                max_tokens=8192,
+                max_tokens=16384,
                 stream=True
             )
 
@@ -321,15 +321,23 @@ class TestGeneratorGUI(QMainWindow):
             # 准备数据
             data = []
             for idx, case in enumerate(test_cases, 1):
-                steps = "\n".join([f"{i + 1}. {step}" for i, step in enumerate(case["steps"])])
+                # 确保步骤是字符串格式
+                if isinstance(case["steps"], list):
+                    steps = "\n".join([f"{i + 1}. {step}" for i, step in enumerate(case["steps"])])
+                else:
+                    steps = str(case["steps"])
+
+                # 获取优先级，如果没有则使用默认值"P1"
+                priority = case.get("priority", "P1")
+
                 data.append({
                     "用例ID": f"TC-{idx:03d}",
-                    "模块" : case["directory"],
+                    "模块": case.get("directory", ""),
                     "用例标题": case["title"],
                     "前置条件": "",
                     "测试步骤": steps,
                     "预期结果": case["expected_result"],
-                    "优先级": "中",
+                    "优先级": priority,  # 使用AI返回的优先级
                     "测试结果": "",
                     "备注": ""
                 })
@@ -346,13 +354,16 @@ class TestGeneratorGUI(QMainWindow):
                 df = df.drop("前置条件", axis=1)
 
             # 保存到Excel
-            df.to_excel(self.output_path.text(), index=False)
+            output_path = self.output_path.text()
+            if not output_path.endswith('.xlsx'):
+                output_path += '.xlsx'
+            df.to_excel(output_path, index=False)
 
             # 显示成功消息
             QMessageBox.information(
                 self,
                 "成功",
-                f"已生成 {len(test_cases)} 个测试用例并保存到：\n{self.output_path.text()}"
+                f"已生成 {len(test_cases)} 个测试用例并保存到：\n{output_path}"
             )
 
         except Exception as e:
