@@ -1,15 +1,18 @@
 import sys
 import json
 import os
+import re
+
 if hasattr(sys, 'frozen'):
     os.environ['PATH'] = sys._MEIPASS + ";" + os.environ['PATH']
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
-                           QHBoxLayout, QLabel, QLineEdit, QTextEdit, QPushButton,
-                           QFileDialog, QMessageBox, QGroupBox, QProgressBar,
-                           QSplitter, QComboBox, QCheckBox, QTabWidget, QStatusBar)
+                             QHBoxLayout, QLabel, QLineEdit, QTextEdit, QPushButton,
+                             QFileDialog, QMessageBox, QGroupBox, QProgressBar,
+                             QSplitter, QComboBox, QCheckBox, QTabWidget, QStatusBar)
 from PyQt5.QtCore import Qt, pyqtSignal, QThread
 import pandas as pd
 from openai import OpenAI
+
 
 class WorkerThread(QThread):
     """用于后台处理的工作线程"""
@@ -17,7 +20,7 @@ class WorkerThread(QThread):
     error = pyqtSignal(str)
     progress = pyqtSignal(str)
 
-    def __init__(self, api_key, base_url, model, system_prompt, user_prompt, requirements):
+    def __init__(self, api_key, base_url, model, system_prompt, user_prompt, requirements, service_type):
         super().__init__()
         self.api_key = api_key
         self.base_url = base_url
@@ -25,6 +28,7 @@ class WorkerThread(QThread):
         self.system_prompt = system_prompt
         self.user_prompt = user_prompt
         self.requirements = requirements
+        self.service_type = service_type  # "DeepSeek" 或 "MiMo"
 
     def run(self):
         try:
@@ -42,49 +46,93 @@ class WorkerThread(QThread):
             # 构建完整的用户提示
             formatted_prompt = tips + self.user_prompt + ',\n需求如下：\n' + self.requirements
 
-            # 调用API
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
+            # 准备API调用参数
+            api_params = {
+                "model": self.model,
+                "messages": [
                     {"role": "system", "content": self.system_prompt},
                     {"role": "user", "content": formatted_prompt}
                 ],
-                temperature=0.7,
-                max_tokens=16384,
-                stream=True
-            )
+                "temperature": 0.7,
+                "max_tokens": 20000,
+                "stream": True
+            }
+
+            # 根据服务类型调整参数
+            if self.service_type == "MiMo":
+                # MiMo API特有参数
+                api_params["extra_body"] = {"thinking": {"type": "disabled"}}
+                api_params["temperature"] = 0.7  # MiMo示例使用0.3
+                api_params["top_p"] = 0.95
+                # MiMo可能需要不同的max_tokens设置，可根据需要启用
+                # api_params["max_tokens"] = 4096
+
+            # 调用API
+            self.progress.emit("正在调用API，请稍候...")
+            response = client.chat.completions.create(**api_params)
 
             full_response = ""
+            # 【关键修复】安全地处理流式响应，避免 index out of range
             for chunk in response:
-                if chunk.choices[0].delta.content:
-                    full_response += chunk.choices[0].delta.content
-                    print(chunk.choices[0].delta.content, end="")
+                # 1. 检查 chunk.choices 列表是否为空
+                if not hasattr(chunk, 'choices') or not chunk.choices:
+                    # 这是一个可能没有内容的数据块，跳过
+                    continue
+
+                # 2. 安全地尝试获取第一个 choice
+                try:
+                    choice = chunk.choices[0]
+                    # 3. 检查 delta 和 content 字段是否存在
+                    if hasattr(choice, 'delta') and choice.delta is not None:
+                        delta = choice.delta
+                        if hasattr(delta, 'content') and delta.content is not None:
+                            content_piece = delta.content
+                            full_response += content_piece
+                            # 可选：如果需要，可以流式更新到UI
+                            # self.progress.emit(f"正在接收数据...长度：{len(full_response)}")
+                except IndexError:
+                    # 捕获并忽略索引错误，继续处理下一个数据块
+                    continue
+                except Exception as e:
+                    # 其他意外错误，记录但继续
+                    print(f"处理数据块时遇到意外错误: {e}")
+                    continue
+
+            self.progress.emit("API响应接收完成，正在解析...")
+
+            # 检查是否收到了有效响应
+            if not full_response.strip():
+                self.error.emit("API返回的响应内容为空，请检查您的请求参数和网络连接。")
+                return
+
+            # 打印原始响应前500字符便于调试（可选）
+            print(f"原始响应预览: {full_response[:500]}...")
 
             # 解析响应
-            result = full_response
-            print(result)
             try:
-                test_cases = json.loads(result)
+                # 首先尝试直接解析完整响应为JSON
+                test_cases = json.loads(full_response)
                 self.finished.emit(test_cases)
             except json.JSONDecodeError:
-                # 如果不是有效的JSON，尝试提取JSON部分
-                import re
-                json_match = re.search(r'(\[.*\]|\{.*\})', result, re.DOTALL)
-                if json_match:
-                    try:
+                # 如果直接解析失败，尝试提取响应中的JSON部分
+                try:
+                    import re
+                    # 匹配类似 [...], {...} 的JSON结构
+                    json_match = re.search(r'(\[.*\]|\{.*\})', full_response, re.DOTALL)
+                    if json_match:
                         extracted_json = json_match.group(0)
                         test_cases = json.loads(extracted_json)
-                        if isinstance(test_cases, dict) and "test_cases" in test_cases:
-                            pass
-                            # return test_cases["test_cases"]
                         self.finished.emit(test_cases)
-                    except:
-                        pass
+                    else:
+                        self.error.emit("无法从API响应中提取有效的JSON数据。响应内容为:\n" + full_response[:1000])
+                except Exception as parse_error:
+                    self.error.emit(f"解析JSON数据失败: {str(parse_error)}\n原始响应开头: {full_response[:500]}")
+            except Exception as e:
+                self.error.emit(f"处理API响应时发生意外错误: {str(e)}")
 
-                # 如果仍然无法解析，抛出异常
-                # raise ValueError("无法从API响应中解析测试用例")
         except Exception as e:
-            self.error.emit(str(e))
+            self.error.emit(f"API调用失败: {str(e)}")
+
 
 class TestGeneratorGUI(QMainWindow):
     def __init__(self):
@@ -112,19 +160,47 @@ class TestGeneratorGUI(QMainWindow):
                 self.config = json.load(f)
         except FileNotFoundError:
             # 如果配置文件不存在，使用默认配置
-            self.config = {...}  # 你的默认配置字典
+            self.config = {
+                "api": {
+                    "api_key": "",
+                    "base_url": "https://api.deepseek.com/v1",
+                    "models": ["deepseek-reasoner", "deepseek-chat"],
+                    "default_model": "deepseek-reasoner",
+                    "mimo": {
+                        "base_url": "https://api.xiaomimimo.com/v1",
+                        "models": ["mimo-v2-flash"],
+                        "default_model": "mimo-v2-flash"
+                    }
+                },
+                "prompts": {
+                    "system_prompt": "你是一名资深软件测试工程师，请根据以下需求生成测试用例，返回JSON格式：\n- 每个测试用例包含：directory(模块),title(标题), steps(步骤列表), expected_result(预期结果),priority(优先级，分为P0、P1、P2)\n- 要求覆盖正常情况和异常情况\n- 测试用例应该详细且具体\n- 确保测试步骤清晰可执行\n- 模块作为分类作用，方便阅读；\n- 测试用例不少于50条\n- 优先级判断标准：\n  P0：核心功能、冒烟测试用例、用于判断版本是否可测，涉及支付/安全、主要业务流程\n  P1：主要功能，保证核心功能的稳定性和正确性、涉及数据完整性\n  P2：次要功能、界面优化、异常场景、边界情况\n\n只需返回JSON数组，不要额外解释。示例格式：\n                                [{{\n                                    \"directory\": \"模块\",\n                                    \"title\": \"测试用例1\",\n                                    \"steps\": [\"步骤1\", \"步骤2\"],\n                                    \"expected_result\": \"预期结果\",\n                                    \"priority\": \"P1\"\n                                   }}],",
+                    "user_prompt": ""
+                },
+                "output": {
+                    "default_filename": "test_cases.xlsx",
+                    "include_id": True,
+                    "include_priority": True,
+                    "include_precondition": True
+                },
+                "ui": {
+                    "window_title": "Deepseek/MiMo 测试用例生成工具",
+                    "window_width": 900,
+                    "window_height": 700
+                }
+            }
             # （可选）在打包环境下创建一个默认配置文件到用户目录
             if not getattr(sys, 'frozen', False):
                 with open('config.json', 'w', encoding='utf-8') as f:
                     json.dump(self.config, f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"加载配置文件失败: {e}")
-            self.config = {...}  # 你的默认配置字典
+            # 使用默认配置
+            self.config = {...}  # 同上默认配置
 
     def initUI(self):
         """初始化用户界面"""
-        self.setWindowTitle('Deepseek 测试用例生成工具 - 增强版')
-        self.setGeometry(100, 100, 900, 700)
+        self.setWindowTitle(self.config["ui"]["window_title"])
+        self.setGeometry(100, 100, self.config["ui"]["window_width"], self.config["ui"]["window_height"])
 
         # 创建中心部件和主布局
         central_widget = QWidget()
@@ -142,6 +218,15 @@ class TestGeneratorGUI(QMainWindow):
         # API配置组
         api_group = QGroupBox("API配置")
         api_group_layout = QVBoxLayout()
+
+        # API服务选择
+        service_layout = QHBoxLayout()
+        self.service_combo = QComboBox()
+        self.service_combo.addItems(["DeepSeek", "MiMo"])
+        self.service_combo.currentTextChanged.connect(self.onServiceChanged)
+        service_layout.addWidget(QLabel("AI服务:"))
+        service_layout.addWidget(self.service_combo)
+        api_group_layout.addLayout(service_layout)
 
         # API Key输入
         key_layout = QHBoxLayout()
@@ -261,6 +346,25 @@ class TestGeneratorGUI(QMainWindow):
         self.statusBar = QStatusBar()
         self.setStatusBar(self.statusBar)
 
+    def onServiceChanged(self, service):
+        """当切换AI服务时，更新对应的Base URL和模型列表"""
+        if service == "MiMo":
+            self.base_url_input.setText(self.config["api"]["mimo"]["base_url"])
+            self.model_combo.clear()
+            self.model_combo.addItems(self.config["api"]["mimo"]["models"])
+            self.model_combo.setCurrentText(self.config["api"]["mimo"]["default_model"])
+            # 清空API Key输入框，提示用户输入MiMo的API Key
+            self.api_key_input.setText("")
+            self.api_key_input.setPlaceholderText("请输入MiMo API Key")
+        else:  # DeepSeek
+            self.base_url_input.setText(self.config["api"]["base_url"])
+            self.model_combo.clear()
+            self.model_combo.addItems(self.config["api"]["models"])
+            self.model_combo.setCurrentText(self.config["api"]["default_model"])
+            # 清空API Key输入框，提示用户输入DeepSeek的API Key
+            self.api_key_input.setText("")
+            self.api_key_input.setPlaceholderText("请输入DeepSeek API Key")
+
     def toggleKeyVisibility(self):
         """切换API Key的可见性"""
         if self.show_key_btn.isChecked():
@@ -297,6 +401,9 @@ class TestGeneratorGUI(QMainWindow):
         self.progress_bar.setRange(0, 0)  # 显示忙碌状态
         self.statusBar.showMessage("正在生成测试用例...")
 
+        # 获取当前选择的服务类型
+        current_service = self.service_combo.currentText()
+
         # 创建工作线程
         self.worker = WorkerThread(
             api_key=self.api_key_input.text(),
@@ -304,7 +411,8 @@ class TestGeneratorGUI(QMainWindow):
             model=self.model_combo.currentText(),
             system_prompt=self.system_prompt_input.toPlainText(),
             user_prompt=self.user_prompt_input.toPlainText(),
-            requirements=self.requirements_input.toPlainText()
+            requirements=self.requirements_input.toPlainText(),
+            service_type=current_service  # 传递服务类型
         )
 
         # 连接信号
@@ -318,26 +426,38 @@ class TestGeneratorGUI(QMainWindow):
     def handleTestCases(self, test_cases):
         """处理生成的测试用例"""
         try:
+            # 确保test_cases是列表格式
+            if isinstance(test_cases, dict) and "test_cases" in test_cases:
+                test_cases_list = test_cases["test_cases"]
+            elif isinstance(test_cases, list):
+                test_cases_list = test_cases
+            else:
+                QMessageBox.warning(self, "警告", "API返回的数据格式不符合预期，尝试处理...")
+                test_cases_list = [test_cases]
+
             # 准备数据
             data = []
-            for idx, case in enumerate(test_cases, 1):
+            for idx, case in enumerate(test_cases_list, 1):
+                # 处理directory字段，如果不存在则使用默认值
+                directory = case.get("directory", "未分类模块")
+
                 # 确保步骤是字符串格式
-                if isinstance(case["steps"], list):
+                if isinstance(case.get("steps", []), list):
                     steps = "\n".join([f"{i + 1}. {step}" for i, step in enumerate(case["steps"])])
                 else:
-                    steps = str(case["steps"])
+                    steps = str(case.get("steps", ""))
 
                 # 获取优先级，如果没有则使用默认值"P1"
                 priority = case.get("priority", "P1")
 
                 data.append({
                     "用例ID": f"TC-{idx:03d}",
-                    "模块": case.get("directory", ""),
-                    "用例标题": case["title"],
-                    "前置条件": "",
+                    "模块": directory,
+                    "用例标题": case.get("title", f"未命名用例{idx}"),
+                    "前置条件": case.get("precondition", ""),
                     "测试步骤": steps,
-                    "预期结果": case["expected_result"],
-                    "优先级": priority,  # 使用AI返回的优先级
+                    "预期结果": case.get("expected_result", ""),
+                    "优先级": priority,
                     "测试结果": "",
                     "备注": ""
                 })
@@ -363,7 +483,7 @@ class TestGeneratorGUI(QMainWindow):
             QMessageBox.information(
                 self,
                 "成功",
-                f"已生成 {len(test_cases)} 个测试用例并保存到：\n{output_path}"
+                f"已生成 {len(test_cases_list)} 个测试用例并保存到：\n{output_path}"
             )
 
         except Exception as e:
