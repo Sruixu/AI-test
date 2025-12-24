@@ -1,6 +1,6 @@
-# Deepseek 测试用例生成工具
+# 大模型AI 测试用例生成工具
 
-基于Deepseek API的测试用例生成工具，提供图形化界面，可以方便地将需求转换为测试用例并导出为Excel格式。
+基于 Deepseek 与 MiMo (小米) 双AI API的测试用例生成工具，提供图形化界面，可方便地将需求转换为结构化测试用例并导出为Excel格式。。
 
 **参考项目**：[monkey410/Ai-test](https://github.com/monkey410/Ai-test.git)
 
@@ -8,12 +8,12 @@
 
 ## ✨ 功能特点
 
-- 🖥️ **图形化界面** - 直观易用的桌面应用程序
-- ⚙️ **自定义API配置** - 灵活配置Deepseek API参数
-- 📝 **模板自定义** - 可修改提示模板以适应不同测试需求
-- 📊 **Excel导出** - 生成格式规范的测试用例Excel文件
-- 📈 **实时进度显示** - 生成过程可视化反馈
-- 🛡️ **错误处理** - 完善的错误提示和异常处理机制
+- 🖥️ **图形化界面** - 直观易用的 PyQt5 桌面应用程序
+- 🔄 **双AI引擎支持** - 支持 **Deepseek API** 与 **MiMo (小米) API** 一键切换
+- ⚙️ **灵活API配置** - 可自定义模型、Base URL 及调用参数
+- 📝 **提示词模板化** - 可修改系统与用户提示词，适应不同测试风格
+- 📊 **Excel导出** - 生成包含用例ID、模块、步骤、预期结果、优先级等字段的规范Excel文件
+- 🗂️ **输出字段自定义** - 可勾选导出字段（用例ID、优先级、前置条件）
 
 ---
 
@@ -21,7 +21,7 @@
 
 ### 环境要求
 - Python 3.10 或更高版本
-- 有效的Deepseek API Key
+- 有效的Deepseek API Key 或 **MiMo API Key** (任选其一即可)
 
 ### 安装步骤
 
@@ -37,13 +37,15 @@
    ```
 
 3. **获取API Key**
-   - 访问 [Deepseek控制台](https://platform.deepseek.com/api_keys)
+   - Deepseek Key： 访问 [Deepseek控制台](https://platform.deepseek.com/api_keys)
+   - MiMo Key：访问 [MiMo开放平台](https://platform.xiaomimimo.com/#/console/api-keys) 申请获取
    - 创建并复制您的API Key
 
 4. **启动应用**
    ```bash
    python main_launcher.py
    ```
+   或直接运行 test_generator_gui.py
 
 ---
 
@@ -53,32 +55,46 @@
 在 “config.json”文件配置API_key
    ```bash
    {
-     "api": {
-    "api_key": "",   在""里输入你的API_key 
+  "api": {
+    "api_key": "您的Deepseek API Key",
     "base_url": "https://api.deepseek.com/v1",
-    "models": ["deepseek-reasoner", "deepseek-chat", "qwen-plus"],
-    "default_model": "deepseek-reasoner"
-  },
+    "models": ["deepseek-reasoner", "deepseek-chat"],
+    "default_model": "deepseek-reasoner",
+    "mimo": {
+      "base_url": "https://api.xiaomimimo.com/v1",
+      "models": ["mimo-v2-flash"],
+      "default_model": "mimo-v2-flash"
+    }
+  }
    ```
 
-### 第二步：输入需求
+### 第二步：运行并设置
 运行后在"需求内容"标签页中：
-- 粘贴或输入详细的需求描述
-- 建议包含功能点、业务场景等关键信息
-
-### 第三步：输出设置
-在"输出设置"标签页中：
-1. **选择保存路径** - 指定Excel文件存储位置
-2. **配置输出选项**：
-   - ✅ 包含用例ID
-   - ✅ 包含优先级
-   - ✅ 包含前置条件
+1. 运行程序，进入 **“API设置”** 标签页。
+2. 在 **“AI服务”** 下拉框中选择本次要使用的服务（DeepSeek 或 MiMo）。
+3. 界面会自动切换对应的Base URL和模型列表。
+4. 在 **“API Key”** 输入框中粘贴对应服务的Key。
+5. 切换服务时，输入框会被清空以防止误用
 
 
-### 第四步：生成测试用例
-1. 点击 **"生成测试用例"** 按钮
-2. 等待进度条完成（通常需要1分钟多甚至更久，AI在思考。。）
-3. 生成完成后会显示保存路径提示
+### 第三步：输入需求与提示词
+1. 在 **“API设置”** 标签页的提示词区域，可调整系统指令 (System Prompt) 和补充说明 (User Prompt)。 
+2. 切换到 **“需求内容”** 标签页，在文本框中粘贴或输入详细的需求描述。
+
+
+### 第四步：配置输出
+切换到 **“输出设置”** 标签页：
+1. **选择保存路径** - 点击“浏览...”指定Excel文件存储位置。
+2. **配输出选项**（勾选即包含）：  
+- ✅ 包含用例ID
+- ✅ 包含优先级（P0/P1/P2）
+- ✅ 包含前置条件
+
+### 第五步：生成与导出
+1. 点击 **“生成测试用例”** 按钮。
+2. 观察底部状态栏和进度条，工具将显示“正在调用API...”、“正在接收数据...”等状态。
+3. **耐心等待**。AI生成与流式接收过程通常需要3-5分钟，请勿关闭窗口。
+4. 生成完成后，会弹出提示框显示保存路径。
 
 ---
 
@@ -87,16 +103,17 @@
 项目使用 `config.json` 配置文件，主要包含：
 ```json
 {
-   "api": {
-      "api_key": "",
-      "base_url": "https://api.deepseek.com/v1",
-      "models": [
-         "deepseek-reasoner",
-         "deepseek-chat",
-         "qwen-plus"
-      ],
-      "default_model": "deepseek-reasoner"
-   }
+  "api": {
+    "api_key": "",
+    "base_url": "https://api.deepseek.com/v1",
+    "models": ["deepseek-reasoner", "deepseek-chat"],
+    "default_model": "deepseek-reasoner",
+    "mimo": {
+      "base_url": "https://api.xiaomimimo.com/v1",
+      "models": ["mimo-v2-flash"],
+      "default_model": "mimo-v2-flash"
+    }
+  }
 }
 ```
 ## 🔧 故障排除
@@ -109,11 +126,11 @@
 
 错误信息解读
 
-- "网络连接失败" - 检查代理设置或网络连接
+- **“API调用失败: ...”：** 通常是网络、Key或服务端问题。请根据具体错误信息判断。
 
-- "API响应超时" - 尝试减少单次生成的数据量
+- **“无法解析API返回的JSON格式”：** AI没有返回纯JSON。请检查并强化 system_prompt 中关于“只返回JSON”的指令。
 
-- "格式解析错误" - 检查需求描述是否包含特殊字符
+- **“响应内容为空”：** API未返回有效内容。请检查需求输入和网络连接。
 
 ## 📝 注意事项
 ### 安全建议
