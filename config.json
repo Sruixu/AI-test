@@ -3,7 +3,12 @@
     "api_key": "",
     "base_url": "https://api.deepseek.com/v1",
     "models": ["deepseek-reasoner", "deepseek-chat", "qwen-plus"],
-    "default_model": "deepseek-reasoner"
+    "default_model": "deepseek-reasoner",
+    "mimo": {
+      "base_url": "https://api.xiaomimimo.com/v1",
+      "models": ["mimo-v2-flash"],
+      "default_model": "mimo-v2-flash"
+    }
   },
   "prompts": {
     "system_prompt": "你是一名资深软件测试工程师，请根据以下需求生成测试用例，返回JSON格式：\n- 每个测试用例包含：directory(模块),title(标题), steps(步骤列表), expected_result(预期结果),priority(优先级，分为P0、P1、P2)\n- 要求覆盖正常情况和异常情况\n- 测试用例应该详细且具体\n- 确保测试步骤清晰可执行\n- 模块作为分类作用，方便阅读；\n- 测试用例不少于50条\n- 优先级判断标准：\n  P0：核心功能、冒烟测试用例、用于判断版本是否可测，涉及支付/安全、主要业务流程\n  P1：主要功能，保证核心功能的稳定性和正确性、涉及数据完整性\n  P2：次要功能、界面优化、异常场景、边界情况\n\n只需返回JSON数组，不要额外解释。示例格式：\n                                [{{\n                                    \"directory\": \"模块\",\n                                    \"title\": \"测试用例1\",\n                                    \"steps\": [\"步骤1\", \"步骤2\"],\n                                    \"expected_result\": \"预期结果\",\n                                    \"priority\": \"P1\"\n                                   }}],",
