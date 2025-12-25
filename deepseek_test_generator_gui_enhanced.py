@@ -54,8 +54,8 @@ class WorkerThread(QThread):
                     {"role": "user", "content": formatted_prompt}
                 ],
                 "temperature": 0.7,
-                "max_tokens": 40000,
-                "stream": True
+                "max_tokens": 16384,
+                "stream": True,
             }
 
             # 根据服务类型调整参数
