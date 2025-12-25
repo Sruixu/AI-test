@@ -17,7 +17,7 @@
     "kimi": {
       "base_url": "https://api.moonshot.cn/v1",
       "models": ["kimi-k2-turbo-preview", "kimi-k2-thinking-turbo"],
-      "default_model": "kimi-k2-turbo-preview"
+      "default_model": "kimi-k2-thinking-turbo"
     }
   },
   "prompts": {
@@ -31,7 +31,7 @@
     "include_precondition": true
   },
   "ui": {
-    "window_title": "Deepseek 测试用例生成工具",
+    "window_title": "AI大模型测试用例生成工具",
     "window_width": 900,
     "window_height": 700
   }
