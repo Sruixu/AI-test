@@ -28,7 +28,7 @@ class WorkerThread(QThread):
         self.system_prompt = system_prompt
         self.user_prompt = user_prompt
         self.requirements = requirements
-        self.service_type = service_type  # "DeepSeek" 或 "MiMo"
+        self.service_type = service_type  # "DeepSeek", "MiMo" 或 "智普AI"
 
     def run(self):
         try:
@@ -54,7 +54,7 @@ class WorkerThread(QThread):
                     {"role": "user", "content": formatted_prompt}
                 ],
                 "temperature": 0.7,
-                "max_tokens": 20000,
+                "max_tokens": 40000,
                 "stream": True
             }
 
@@ -62,10 +62,21 @@ class WorkerThread(QThread):
             if self.service_type == "MiMo":
                 # MiMo API特有参数
                 api_params["extra_body"] = {"thinking": {"type": "disabled"}}
-                api_params["temperature"] = 0.7  # MiMo示例使用0.3
+                api_params["temperature"] = 0.3
                 api_params["top_p"] = 0.95
-                # MiMo可能需要不同的max_tokens设置，可根据需要启用
-                # api_params["max_tokens"] = 4096
+            elif self.service_type == "智普AI":
+                # 智普AI特有参数
+                api_params["extra_body"] = {
+                    "thinking": {
+                        "type": "enabled"
+                    }
+                }
+                # 智普AI可能需要调整temperature
+                api_params["temperature"] = 0.7
+            elif self.service_type == "Kimi":
+                # Kimi API参数 - 使用默认配置，可根据需要调整
+                api_params["temperature"] = 0.6
+                api_params["top_p"] = 0.95
 
             # 调用API
             self.progress.emit("正在调用API，请稍候...")
@@ -78,18 +89,25 @@ class WorkerThread(QThread):
                 if not hasattr(chunk, 'choices') or not chunk.choices:
                     # 这是一个可能没有内容的数据块，跳过
                     continue
-
                 # 2. 安全地尝试获取第一个 choice
                 try:
                     choice = chunk.choices[0]
                     # 3. 检查 delta 和 content 字段是否存在
-                    if hasattr(choice, 'delta') and choice.delta is not None:
-                        delta = choice.delta
-                        if hasattr(delta, 'content') and delta.content is not None:
-                            content_piece = delta.content
-                            full_response += content_piece
-                            # 可选：如果需要，可以流式更新到UI
-                            # self.progress.emit(f"正在接收数据...长度：{len(full_response)}")
+                    if self.service_type in ["智普AI", "Kimi"]:
+                        # 智普AI和Kimi的响应可能包含reasoning_content和content
+                        if hasattr(choice, 'delta') and choice.delta is not None:
+                            delta = choice.delta
+                            # 如果有reasoning_content，跳过它
+                            if hasattr(delta, 'content') and delta.content is not None:
+                                content_piece = delta.content
+                                full_response += content_piece
+                    else:
+                        # 其他服务的处理方式不变
+                        if hasattr(choice, 'delta') and choice.delta is not None:
+                            delta = choice.delta
+                            if hasattr(delta, 'content') and delta.content is not None:
+                                content_piece = delta.content
+                                full_response += content_piece
                 except IndexError:
                     # 捕获并忽略索引错误，继续处理下一个数据块
                     continue
@@ -170,6 +188,11 @@ class TestGeneratorGUI(QMainWindow):
                         "base_url": "https://api.xiaomimimo.com/v1",
                         "models": ["mimo-v2-flash"],
                         "default_model": "mimo-v2-flash"
+                    },
+                    "zhipu": {
+                        "base_url": "https://open.bigmodel.cn/api/paas/v4/",
+                        "models": ["glm-4.7", "glm-4.6"],
+                        "default_model": "glm-4.7"
                     }
                 },
                 "prompts": {
@@ -222,7 +245,7 @@ class TestGeneratorGUI(QMainWindow):
         # API服务选择
         service_layout = QHBoxLayout()
         self.service_combo = QComboBox()
-        self.service_combo.addItems(["DeepSeek", "MiMo"])
+        self.service_combo.addItems(["DeepSeek", "MiMo", "智普AI", "Kimi"])
         self.service_combo.currentTextChanged.connect(self.onServiceChanged)
         service_layout.addWidget(QLabel("AI服务:"))
         service_layout.addWidget(self.service_combo)
@@ -356,6 +379,21 @@ class TestGeneratorGUI(QMainWindow):
             # 清空API Key输入框，提示用户输入MiMo的API Key
             self.api_key_input.setText("")
             self.api_key_input.setPlaceholderText("请输入MiMo API Key")
+        elif service == "智普AI":
+            self.base_url_input.setText(self.config["api"]["zhipu"]["base_url"])
+            self.model_combo.clear()
+            self.model_combo.addItems(self.config["api"]["zhipu"]["models"])
+            self.model_combo.setCurrentText(self.config["api"]["zhipu"]["default_model"])
+            # 清空API Key输入框，提示用户输入智普AI的API Key
+            self.api_key_input.setText("")
+            self.api_key_input.setPlaceholderText("请输入智普AI API Key")
+        elif service == "Kimi":
+            self.base_url_input.setText(self.config["api"]["kimi"]["base_url"])
+            self.model_combo.clear()
+            self.model_combo.addItems(self.config["api"]["kimi"]["models"])
+            self.model_combo.setCurrentText(self.config["api"]["kimi"]["default_model"])
+            self.api_key_input.setText("")
+            self.api_key_input.setPlaceholderText("请输入Kimi API Key")
         else:  # DeepSeek
             self.base_url_input.setText(self.config["api"]["base_url"])
             self.model_combo.clear()
