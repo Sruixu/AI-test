@@ -529,13 +529,10 @@ class TestGeneratorGUI(QMainWindow):
             self.output_path.setText(filename)
 
     def generateTestCases(self):
-        """生成测试用例"""
-        if not self.api_key_input.text():
-            QMessageBox.warning(self, "错误", "请输入 API Key")
-            return
-
-        if not self.requirements_input.toPlainText():
-            QMessageBox.warning(self, "错误", "请输入需求内容")
+        """生成测试用例（带验证）"""
+        errors = self.validateInputs()
+        if errors:
+            QMessageBox.warning(self, "输入验证", "\n".join(errors))
             return
 
         self.generate_btn.setEnabled(False)
@@ -561,6 +558,24 @@ class TestGeneratorGUI(QMainWindow):
         self.worker.progress.connect(self.updateProgress)
 
         self.worker.start()
+
+    def validateInputs(self):
+        """验证输入内容"""
+        errors = []
+
+        if not self.api_key_input.text().strip():
+            errors.append("API Key不能为空")
+
+        if not self.base_url_input.text().strip():
+            errors.append("Base URL不能为空")
+
+        if not self.requirements_input.toPlainText().strip():
+            errors.append("需求内容不能为空")
+
+        if not self.model_combo.currentText():
+            errors.append("请选择模型")
+
+        return errors
 
     def handleTestCases(self, test_cases):
         """处理生成的测试用例"""
@@ -626,13 +641,32 @@ class TestGeneratorGUI(QMainWindow):
             self.statusBar.showMessage("就绪")
 
     def handleError(self, error_msg):
-        """处理错误"""
-        QMessageBox.critical(self, "错误", error_msg)
+        """处理错误，提供更友好的错误信息"""
+        error_mapping = {
+            "401": "API密钥无效或权限不足",
+            "402": "账户余额不足",
+            "429": "请求频率过高，请稍后重试",
+            "422": "请求参数错误，请检查输入",
+            "500": "服务器内部错误",
+            "503": "服务不可用"
+        }
+
+        # 提取HTTP状态码
+        import re
+        status_match = re.search(r'HTTP (\d{3})', error_msg)
+        if status_match:
+            status_code = status_match.group(1)
+            friendly_error = error_mapping.get(status_code, f"未知错误 (状态码: {status_code})")
+            display_msg = f"{friendly_error}\n\n详细信息: {error_msg}"
+        else:
+            display_msg = error_msg
+
+        QMessageBox.critical(self, "错误", display_msg)
+
+        # 恢复UI状态
         self.generate_btn.setEnabled(True)
         self.generate_btn.setText("🚀 开始生成测试用例")
         self.progress_bar.setVisible(False)
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
         self.statusBar.showMessage("出错")
 
     def updateProgress(self, message):
