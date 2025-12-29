@@ -628,27 +628,32 @@ class TestGeneratorGUI(QMainWindow):
     def handleError(self, error_msg):
         """处理错误，提供更友好的错误信息"""
         error_mapping = {
-            "401": "API密钥无效或权限不足",
-            "402": "账户余额不足",
-            "429": "请求频率过高，请稍后重试",
-            "422": "请求参数错误，请检查输入",
-            "500": "服务器内部错误",
-            "503": "服务不可用"
+            "401": ("API密钥无效或权限不足", "请检查API密钥是否正确，或是否具有访问权限"),
+            "402": ("账户余额不足", "请充值或检查账户余额"),
+            "429": ("请求频率过高", "请稍后重试，或降低请求频率"),
+            "422": ("请求参数错误", "请检查输入内容是否符合要求"),
+            "500": ("服务器内部错误", "这是服务端问题，请稍后重试"),
+            "503": ("服务不可用", "服务暂时不可用，请稍后重试")
         }
 
-        # 提取HTTP状态码
         import re
         status_match = re.search(r'HTTP (\d{3})', error_msg)
+
         if status_match:
             status_code = status_match.group(1)
-            friendly_error = error_mapping.get(status_code, f"未知错误 (状态码: {status_code})")
-            display_msg = f"{friendly_error}\n\n详细信息: {error_msg}"
+            error_info = error_mapping.get(status_code, ("未知错误", str(error_msg)))
+            display_msg = f"错误代码：{status_code}\n{error_info[0]}\n\n{error_info[1]}"
         else:
-            display_msg = error_msg
+            # 网络错误处理
+            if "ConnectionError" in error_msg:
+                display_msg = "网络连接失败\n\n请检查网络连接，或API服务是否可用"
+            elif "Timeout" in error_msg:
+                display_msg = "请求超时\n\n服务器响应时间过长，请稍后重试"
+            else:
+                display_msg = f"发生错误：\n{error_msg}"
 
         QMessageBox.critical(self, "错误", display_msg)
 
-        # 恢复UI状态
         self.generate_btn.setEnabled(True)
         self.generate_btn.setText("🚀 开始生成测试用例")
         self.progress_bar.setVisible(False)
