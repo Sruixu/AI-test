@@ -147,7 +147,7 @@ class WorkerThread(QThread):
         self.system_prompt = system_prompt
         self.user_prompt = user_prompt
         self.requirements = requirements
-        self.service_type = service_type  # "DeepSeek", "MiMo" 或 "智普AI"
+        self.service_type = service_type  # "DeepSeek", "MiMo", "智普AI", "Kimi" 或 "MiniMax"
 
     def run(self):
         try:
@@ -185,6 +185,14 @@ class WorkerThread(QThread):
             elif self.service_type == "Kimi":
                 api_params["temperature"] = 0.6
                 api_params["top_p"] = 0.95
+            elif self.service_type == "MiniMax":
+                api_params["temperature"] = 0.7
+                api_params["top_p"] = 0.95
+                # MiniMax特定参数
+                api_params["extra_body"] = {
+                    "tokens_to_generate": 16384,
+                    "skip_unknown_tokens": True
+                }
 
             self.progress.emit("正在调用API，请稍候...")
             response = client.chat.completions.create(**api_params)
@@ -261,52 +269,11 @@ class TestGeneratorGUI(QMainWindow):
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 self.config = json.load(f)
-        except FileNotFoundError:
-            self.config = {
-                "api": {
-                    "api_key": "",
-                    "base_url": "https://api.deepseek.com/v1",
-                    "models": ["deepseek-reasoner", "deepseek-chat", "qwen-plus"],
-                    "default_model": "deepseek-reasoner",
-                    "mimo": {
-                        "base_url": "https://api.xiaomimimo.com/v1",
-                        "models": ["mimo-v2-flash"],
-                        "default_model": "mimo-v2-flash"
-                    },
-                    "zhipu": {
-                        "base_url": "https://open.bigmodel.cn/api/paas/v4/",
-                        "models": ["glm-4.6", "glm-4.7"],
-                        "default_model": "glm-4.7"
-                    },
-                    "kimi": {
-                        "base_url": "https://api.moonshot.cn/v1",
-                        "models": ["kimi-k2-turbo-preview", "kimi-k2-thinking-turbo"],
-                        "default_model": "kimi-k2-thinking-turbo"
-                    }
-                },
-                "prompts": {
-                    "system_prompt": "你是一名资深软件测试工程师，请根据以下需求生成测试用例，返回JSON格式：\n- 每个测试用例包含：directory(模块),title(标题), steps(步骤列表), expected_result(预期结果),priority(优先级，分为P0、P1、P2)\n- 要求覆盖正常情况和异常情况\n- 测试用例应该详细且具体\n- 确保测试步骤清晰可执行\n- 模块作为分类作用，方便阅读；\n- 测试用例不少于50条\n- 优先级判断标准：\n  P0：核心功能、冒烟测试用例、用于判断版本是否可测，涉及支付/安全、主要业务流程\n  P1：主要功能，保证核心功能的稳定性和正确性、涉及数据完整性\n  P2：次要功能、界面优化、异常场景、边界情况\n\n只需返回JSON数组，不要额外解释。示例格式：\n                                [{{\n                                    \"directory\": \"模块\",\n                                    \"title\": \"测试用例1\",\n                                    \"steps\": [\"步骤1\", \"步骤2\"],\n                                    \"expected_result\": \"预期结果\",\n                                    \"priority\": \"P1\"\n                                   }}],",
-                    "user_prompt": ""
-                },
-                "output": {
-                    "default_filename": "test_cases.xlsx",
-                    "include_id": True,
-                    "include_priority": True,
-                    "include_precondition": True
-                },
-                "ui": {
-                    "window_title": "AI大模型测试用例生成工具",
-                    "window_width": 1000,
-                    "window_height": 750
-                }
-            }
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"加载配置文件失败: {e}，使用默认配置")
+            self.config = self.get_default_config()
             if not getattr(sys, 'frozen', False):
-                with open('config.json', 'w', encoding='utf-8') as f:
-                    json.dump(self.config, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"加载配置文件失败: {e}")
-            # 使用硬编码的默认配置防止崩溃
-            pass
+                self.save_default_config()
 
     def initUI(self):
         """初始化用户界面"""
@@ -337,7 +304,7 @@ class TestGeneratorGUI(QMainWindow):
         service_layout = QHBoxLayout()
         service_layout.addWidget(QLabel("AI 服务:"))
         self.service_combo = QComboBox()
-        self.service_combo.addItems(["DeepSeek", "MiMo", "智普AI", "Kimi"])
+        self.service_combo.addItems(["DeepSeek", "MiMo", "智普AI", "Kimi", "MiniMax"])
         self.service_combo.currentTextChanged.connect(self.onServiceChanged)
         service_layout.addWidget(self.service_combo, 1)
         api_group_layout.addLayout(service_layout)
@@ -500,6 +467,13 @@ class TestGeneratorGUI(QMainWindow):
             self.model_combo.setCurrentText(self.config["api"]["kimi"]["default_model"])
             self.api_key_input.setText("")
             self.api_key_input.setPlaceholderText("请输入 Kimi API Key")
+        elif service == "MiniMax":
+            self.base_url_input.setText(self.config["api"]["minimax"]["base_url"])
+            self.model_combo.clear()
+            self.model_combo.addItems(self.config["api"]["minimax"]["models"])
+            self.model_combo.setCurrentText(self.config["api"]["minimax"]["default_model"])
+            self.api_key_input.setText("")
+            self.api_key_input.setPlaceholderText("请输入 MiniMax API Key")
         else:  # DeepSeek
             self.base_url_input.setText(self.config["api"]["base_url"])
             self.model_combo.clear()
@@ -592,7 +566,18 @@ class TestGeneratorGUI(QMainWindow):
             for idx, case in enumerate(test_cases_list, 1):
                 directory = case.get("directory", "未分类模块")
                 if isinstance(case.get("steps", []), list):
-                    steps = "\n".join([f"{i + 1}. {step}" for i, step in enumerate(case["steps"])])
+                    # 检查步骤是否已经包含序号（以"1. "、"2. "等开头）
+                    def is_step_with_number(step):
+                        step = step.strip()
+                        # 检查是否以"数字. "或"数字、 "开头
+                        import re
+                        return bool(re.match(r'^\d+[.\、]\s', step))
+
+                    # 如果步骤已经有序号，直接使用；否则添加序号
+                    if is_step_with_number(case["steps"][0]):
+                        steps = "\n".join(case["steps"])
+                    else:
+                        steps = "\n".join([f"{i + 1}. {step}" for i, step in enumerate(case["steps"])])
                 else:
                     steps = str(case.get("steps", ""))
                 priority = case.get("priority", "P1")
