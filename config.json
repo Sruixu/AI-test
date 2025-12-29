@@ -9,15 +9,20 @@
       "models": ["mimo-v2-flash"],
       "default_model": "mimo-v2-flash"
     },
-     "zhipu": {
+    "zhipu": {
       "base_url": "https://open.bigmodel.cn/api/paas/v4/",
-      "models": ["glm-4.6","glm-4.7"],
+      "models": ["glm-4.6", "glm-4.7"],
       "default_model": "glm-4.7"
     },
     "kimi": {
       "base_url": "https://api.moonshot.cn/v1",
       "models": ["kimi-k2-turbo-preview", "kimi-k2-thinking-turbo"],
       "default_model": "kimi-k2-thinking-turbo"
+    },
+    "minimax": {
+      "base_url": "https://api.minimaxi.com/v1",
+      "models": ["MiniMax-M2.1", "MiniMax-M2.1-lightning", "MiniMax-M2"],
+      "default_model": "MiniMax-M2.1"
     }
   },
   "prompts": {
