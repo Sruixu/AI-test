@@ -1,6 +1,6 @@
 # 大模型AI 测试用例生成工具
 
-基于 **Deepseek** 、 **MiMo (小米)**、 **智谱 (Zhipu)** 及 **Kimi** 多模型 API的测试用例生成工具，提供图形化界面，可方便地将需求转换为结构化测试用例并导出为Excel格式。。
+基于**Deepseek** 、 **MiMo (小米)**、 **智谱 (Zhipu)**  **Kimi** 及 **MiniMax** 多模型 API的测试用例生成工具，提供图形化界面，可方便地将需求转换为结构化测试用例并导出为Excel格式。。
 
 **参考项目**：[monkey410/Ai-test](https://github.com/monkey410/Ai-test.git)
 
@@ -9,7 +9,7 @@
 ## ✨ 功能特点
 
 - 🖥️ **图形化界面** - 直观易用的 PyQt5 桌面应用程序
-- 🔄 **多 AI 引擎支持** - 一键切换 **Deepseek**、**MiMo (小米)**、**智谱 (Zhipu)** 和 **Kimi** 等主流大模型。
+- 🔄 **多 AI 引擎支持** - 一键切换 **Deepseek**、**MiMo (小米)**、**智谱 (Zhipu)** 、**MiniMax** 和 **Kimi** 等主流大模型。
 - ⚙️ **灵活API配置** - 可自定义模型、Base URL 及调用参数
 - 📝 **提示词模板化** - 可修改系统与用户提示词，适应不同测试风格
 - 📊 **Excel导出** - 生成包含用例ID、模块、步骤、预期结果、优先级等字段的规范Excel文件
@@ -21,7 +21,7 @@
 
 ### 环境要求
 - Python 3.10 或更高版本
-- 有效的 API Key（支持 Deepseek、MiMo、Zhipu、Kimi 任选其一或多个）
+- 有效的 API Key（支持 Deepseek、MiMo、Zhipu、Kimi、MiniMax 任选其一或多个）
 
 ### 安装步骤
 
@@ -41,7 +41,7 @@
    - MiMo Key：访问 [MiMo开放平台](https://platform.xiaomimimo.com/#/console/api-keys) 
    - 智谱Key : 访问 [智谱AI开放平台](https://bigmodel.cn/usercenter/proj-mgmt/apikeys) 
    - Kimi Key : 访问 [Moonshot AI开放平台](https://platform.moonshot.cn/console/api-keys)
-
+   - MiniMax Key：访问 [MiniMax开放平台](https://platform.minimaxi.com/user-center/basic-information)
 4. **启动应用**
    ```bash
    python main_launcher.py
