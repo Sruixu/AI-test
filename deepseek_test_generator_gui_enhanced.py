@@ -186,12 +186,12 @@ class WorkerThread(QThread):
                 api_params["temperature"] = 0.6
                 api_params["top_p"] = 0.95
             elif self.service_type == "MiniMax":
-                api_params["temperature"] = 0.7
-                api_params["top_p"] = 0.95
+                api_params["temperature"] = 0.4
+                api_params["top_p"] = 0.9
                 # MiniMax特定参数
                 api_params["extra_body"] = {
                     "tokens_to_generate": 16384,
-                    "skip_unknown_tokens": True
+                    "skip_unknown_tokens": True,
                 }
 
             self.progress.emit("正在调用API，请稍候...")
@@ -228,7 +228,6 @@ class WorkerThread(QThread):
                 return
 
             print(f"原始响应预览: {full_response[:500]}...")
-
             try:
                 test_cases = json.loads(full_response)
                 self.finished.emit(test_cases)
