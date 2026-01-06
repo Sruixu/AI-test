@@ -192,6 +192,7 @@ class WorkerThread(QThread):
                 api_params["extra_body"] = {
                     "tokens_to_generate": 16384,
                     "skip_unknown_tokens": True,
+                    "thinking": {"type": "disabled"}
                 }
 
             self.progress.emit("正在调用API，请稍候...")
