@@ -171,7 +171,7 @@ class WorkerThread(QThread):
                     {"role": "user", "content": formatted_prompt}
                 ],
                 "temperature": 0.7,
-                "max_tokens": 16384,
+                "max_tokens": 24576,
                 "stream": True,
             }
 
@@ -190,10 +190,15 @@ class WorkerThread(QThread):
                 api_params["top_p"] = 0.9
                 # MiniMax特定参数
                 api_params["extra_body"] = {
-                    "tokens_to_generate": 16384,
+                    "tokens_to_generate": 24576,
                     "skip_unknown_tokens": True,
                     "thinking": {"type": "disabled"}
                 }
+            elif self.service_type == "腾讯混元":
+                # 腾讯混元模型参数配置
+                api_params["temperature"] = 0.5
+                api_params["top_p"] = 0.9
+                api_params["max_tokens"] = 32768
 
             self.progress.emit("正在调用API，请稍候...")
             response = client.chat.completions.create(**api_params)
@@ -304,7 +309,7 @@ class TestGeneratorGUI(QMainWindow):
         service_layout = QHBoxLayout()
         service_layout.addWidget(QLabel("AI 服务:"))
         self.service_combo = QComboBox()
-        self.service_combo.addItems(["DeepSeek", "MiMo", "智普AI", "Kimi", "MiniMax"])
+        self.service_combo.addItems(["DeepSeek", "MiMo", "智普AI", "Kimi", "MiniMax", "腾讯混元"])
         self.service_combo.currentTextChanged.connect(self.onServiceChanged)
         service_layout.addWidget(self.service_combo, 1)
         api_group_layout.addLayout(service_layout)
@@ -474,6 +479,13 @@ class TestGeneratorGUI(QMainWindow):
             self.model_combo.setCurrentText(self.config["api"]["minimax"]["default_model"])
             self.api_key_input.setText("")
             self.api_key_input.setPlaceholderText("请输入 MiniMax API Key")
+        elif service == "腾讯混元":
+            self.base_url_input.setText(self.config["api"]["tencent"]["base_url"])
+            self.model_combo.clear()
+            self.model_combo.addItems(self.config["api"]["tencent"]["models"])
+            self.model_combo.setCurrentText(self.config["api"]["tencent"]["default_model"])
+            self.api_key_input.setText("")
+            self.api_key_input.setPlaceholderText("请输入腾讯混元 API Key")
         else:  # DeepSeek
             self.base_url_input.setText(self.config["api"]["base_url"])
             self.model_combo.clear()
