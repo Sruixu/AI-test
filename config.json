@@ -23,6 +23,11 @@
       "base_url": "https://api.minimaxi.com/v1",
       "models": ["MiniMax-M2.1", "MiniMax-M2.1-lightning", "MiniMax-M2"],
       "default_model": "MiniMax-M2.1"
+    },
+    "tencent": {
+      "base_url": "https://api.hunyuan.cloud.tencent.com/v1",
+      "models": ["hunyuan-2.0-thinking-20251109", "hunyuan-2.0-instruct-20251111"],
+      "default_model": "hunyuan-2.0-thinking-20251109"
     }
   },
   "prompts": {
